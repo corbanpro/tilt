@@ -3,13 +3,9 @@ import {
   AccordionDetails,
   AccordionSummary,
 } from "@material-ui/core"
-import React, { ChangeEvent, useCallback, useState } from "react"
+import React, { ChangeEvent } from "react"
 import { Link } from "react-router-dom"
 import styled from "styled-components"
-import {
-  DEFAULT_RESOURCE_LIST_LIMIT,
-  RESOURCE_LIST_MULTIPLIER,
-} from "./constants"
 import { FeaturesContext, Flag, useFeatures } from "./feature"
 import {
   GroupByLabelView,
@@ -37,7 +33,6 @@ import {
   matchesStatusFilter,
   SidebarGroupStatusSummary,
 } from "./ResourceStatusSummary"
-import { ShowMoreButton } from "./ShowMoreButton"
 import SidebarItem from "./SidebarItem"
 import SidebarItemView, {
   sidebarItemIsDisabled,
@@ -272,41 +267,10 @@ export function SidebarListSection(props: SidebarSectionProps): JSX.Element {
   )
 }
 
-const ShowMoreRow = styled.li`
-  margin: ${SizeUnit(0.5)} ${SizeUnit(0.5)} 0 ${SizeUnit(0.5)};
-  display: flex;
-  align-items: center;
-  justify-content: right;
-`
-
 function SidebarListSectionItems(props: SidebarSectionProps) {
-  let [maxItems, setMaxItems] = useState(DEFAULT_RESOURCE_LIST_LIMIT)
-  let displayItems = props.items
-  let moreItems = Math.max(displayItems.length - maxItems, 0)
-  if (moreItems) {
-    displayItems = displayItems.slice(0, maxItems)
-  }
-
-  let showMore = useCallback(() => {
-    setMaxItems(maxItems * RESOURCE_LIST_MULTIPLIER)
-  }, [maxItems, setMaxItems])
-
-  let showMoreItemsButton = null
-  if (moreItems > 0) {
-    showMoreItemsButton = (
-      <ShowMoreRow>
-        <ShowMoreButton
-          onClick={showMore}
-          currentListSize={maxItems}
-          itemCount={props.items.length}
-        />
-      </ShowMoreRow>
-    )
-  }
-
   return (
     <>
-      {displayItems.map((item) => (
+      {props.items.map((item) => (
         <SidebarItemView
           key={"sidebarItem-" + item.name}
           groupView={props.groupView}
@@ -316,7 +280,6 @@ function SidebarListSectionItems(props: SidebarSectionProps) {
           resourceView={props.resourceView}
         />
       ))}
-      {showMoreItemsButton}
     </>
   )
 }

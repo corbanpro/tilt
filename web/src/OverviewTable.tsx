@@ -5,7 +5,6 @@ import {
 } from "@material-ui/core"
 import React, {
   ChangeEvent,
-  MouseEvent,
   MutableRefObject,
   useEffect,
   useMemo,
@@ -19,7 +18,6 @@ import {
   TableHeaderProps,
   TableOptions,
   TableState,
-  usePagination,
   useSortBy,
   UseSortByState,
   useTable,
@@ -27,10 +25,6 @@ import {
 import styled from "styled-components"
 import { buildAlerts, runtimeAlerts } from "./alerts"
 import { ApiButtonType, buttonsForComponent } from "./ApiButton"
-import {
-  DEFAULT_RESOURCE_LIST_LIMIT,
-  RESOURCE_LIST_MULTIPLIER,
-} from "./constants"
 import Features, { Flag, useFeatures } from "./feature"
 import { Hold } from "./Hold"
 import {
@@ -69,7 +63,6 @@ import {
   matchesStatusFilter,
   TableGroupStatusSummary,
 } from "./ResourceStatusSummary"
-import { ShowMoreButton } from "./ShowMoreButton"
 import { buildStatus, combinedStatus, runtimeStatus } from "./status"
 import { Color, Font, FontSize, SizeUnit } from "./style-helpers"
 import { isZeroTime, timeDiff } from "./time"
@@ -607,35 +600,6 @@ export function ResourceTableHeadRow({
   )
 }
 
-function ShowMoreResourcesRow({
-  colSpan,
-  itemCount,
-  pageSize,
-  onClick,
-}: {
-  colSpan: number
-  itemCount: number
-  pageSize: number
-  onClick: (e: MouseEvent) => void
-}) {
-  if (itemCount <= pageSize) {
-    return null
-  }
-
-  return (
-    <ResourceTableRow className="isFixedHeight">
-      <ResourceTableData colSpan={colSpan - 2} />
-      <ResourceTableData className="alignRight" colSpan={2}>
-        <ShowMoreButton
-          itemCount={itemCount}
-          currentListSize={pageSize}
-          onClick={onClick}
-        />
-      </ResourceTableData>
-    </ResourceTableRow>
-  )
-}
-
 function TableRow(props: { row: Row<RowValues>; focused: string }) {
   let { row, focused } = props
   const { isSelected } = useResourceSelection()
@@ -677,28 +641,16 @@ export function Table(props: TableProps) {
     return null
   }
 
-  const {
-    getTableProps,
-    getTableBodyProps,
-    headerGroups,
-    rows, // Used to calculate the total number of rows
-    page, // Used to render the rows for the current page
-    prepareRow,
-    state: { pageSize },
-    setPageSize,
-  } = useTable(
-    {
-      columns: props.columns,
-      data: props.data,
-      autoResetSortBy: false,
-      useControlledState: props.useControlledState,
-      initialState: { pageSize: DEFAULT_RESOURCE_LIST_LIMIT },
-    },
-    useSortBy,
-    usePagination
-  )
-
-  const showMoreOnClick = () => setPageSize(pageSize * RESOURCE_LIST_MULTIPLIER)
+  const { getTableProps, getTableBodyProps, headerGroups, rows, prepareRow } =
+    useTable(
+      {
+        columns: props.columns,
+        data: props.data,
+        autoResetSortBy: false,
+        useControlledState: props.useControlledState,
+      },
+      useSortBy
+    )
 
   // TODO (lizz): Consider adding `aria-sort` markup to table headings
   return (
@@ -713,7 +665,7 @@ export function Table(props: TableProps) {
         ))}
       </ResourceTableHead>
       <tbody {...getTableBodyProps()}>
-        {page.map((row: Row<RowValues>) => {
+        {rows.map((row: Row<RowValues>) => {
           prepareRow(row)
           return (
             <TableRow
@@ -723,12 +675,6 @@ export function Table(props: TableProps) {
             />
           )
         })}
-        <ShowMoreResourcesRow
-          itemCount={rows.length}
-          pageSize={pageSize}
-          onClick={showMoreOnClick}
-          colSpan={props.columns.length}
-        />
       </tbody>
     </ResourceTable>
   )
