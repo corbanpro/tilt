@@ -9,7 +9,11 @@ import {
   ResourceListOptionsProvider,
   RESOURCE_LIST_OPTIONS_KEY,
 } from "./ResourceListOptionsContext"
-import { ResourceNameFilter } from "./ResourceNameFilter"
+import {
+  matchesResourceName,
+  ResourceNameFilter,
+  resourceNameFilterError,
+} from "./ResourceNameFilter"
 
 const resourceListOptionsAccessor = accessorsForTesting<ResourceListOptions>(
   RESOURCE_LIST_OPTIONS_KEY,
@@ -29,6 +33,23 @@ function customRender(component: JSX.Element, options?: RenderOptions) {
     ),
   })
 }
+
+describe("matchesResourceName", () => {
+  it("treats the filter as a case-insensitive regexp", () => {
+    expect(matchesResourceName("vigoda", "vig")).toBe(true)
+    expect(matchesResourceName("vigoda", "VIG")).toBe(true)
+    expect(matchesResourceName("frontend", "end$")).toBe(true)
+    expect(matchesResourceName("frontend", "^front")).toBe(true)
+    expect(matchesResourceName("frontend", "back")).toBe(false)
+  })
+
+  it("matches everything when the filter is blank or invalid", () => {
+    expect(matchesResourceName("vigoda", "  ")).toBe(true)
+    expect(matchesResourceName("vigoda", "(")).toBe(true)
+    expect(resourceNameFilterError("(")).toMatch(/Invalid regexp/)
+    expect(resourceNameFilterError("vig")).toBe("")
+  })
+})
 
 describe("ResourceNameFilter", () => {
   beforeEach(() => {

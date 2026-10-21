@@ -177,7 +177,7 @@ describe("SidebarResources", () => {
         )
 
         const resourceNameFilter = screen.getByPlaceholderText(
-          "Filter resources by name"
+          "Filter resources by regexp"
         )
         expect(resourceNameFilter).toHaveValue(
           resourceListOptions.resourceNameFilter
@@ -213,7 +213,7 @@ describe("SidebarResources", () => {
         }
 
         const resourceNameFilter = screen.getByPlaceholderText(
-          "Filter resources by name"
+          "Filter resources by regexp"
         )
         if (expectedOptions.resourceNameFilter) {
           userEvent.type(resourceNameFilter, expectedOptions.resourceNameFilter)

@@ -66,7 +66,7 @@ describe("HeaderBar", () => {
 
     it("focuses and selects the resource name filter on '/' keypress", () => {
       const filter = screen.getByPlaceholderText(
-        "Filter resources by name"
+        "Filter resources by regexp"
       ) as HTMLInputElement
       userEvent.type(filter, "existing")
       filter.blur()

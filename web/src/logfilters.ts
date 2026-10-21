@@ -2,7 +2,6 @@
 
 import { Location } from "history"
 import { useLocation } from "react-router"
-import RegexEscape from "regex-escape"
 
 export enum FilterLevel {
   all = "",
@@ -62,23 +61,8 @@ export const EMPTY_FILTER_TERM: FilterTerm = {
 // We don't want our regexp to be stateful (so no 'g' flag).
 const TERM_REGEXP_FLAGS = "i"
 
-export function isRegexp(input: string): boolean {
-  return input.length > 2 && input[0] === "/" && input[input.length - 1] === "/"
-}
-
 export function parseTermInput(input: string): RegExp {
-  // Input strings that are surrounded by `/` can be parsed as regular expressions
-  if (isRegexp(input)) {
-    const regexpInput = input.slice(1, input.length - 1)
-
-    return new RegExp(regexpInput, TERM_REGEXP_FLAGS)
-  } else {
-    // Input strings that aren't regular expressions should have all
-    // special characters escaped so they can be treated literally
-    const escapedInput = RegexEscape(input)
-
-    return new RegExp(escapedInput, TERM_REGEXP_FLAGS)
-  }
+  return new RegExp(input, TERM_REGEXP_FLAGS)
 }
 
 export function createFilterTermState(input: string): FilterTerm {

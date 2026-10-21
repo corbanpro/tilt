@@ -462,7 +462,7 @@ function FilterTermFieldError({ error }: { error: string }) {
 
 const filterTermTooltipContent = (
   <>
-    RegExp should be wrapped in forward slashes, is case-insensitive, and is{" "}
+    RegExp is case-insensitive and is{" "}
     <a
       href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions"
       target="_blank"
@@ -555,12 +555,12 @@ export function FilterTermField({ termFromUrl }: { termFromUrl: FilterTerm }) {
         }
         InputProps={inputProps}
         onChange={onChange}
-        placeholder="Filter by text or /regexp/"
+        placeholder="Filter by regexp"
         value={filterTerm}
         variant="outlined"
       />
       <SrOnly component="label" htmlFor={FILTER_FIELD_ID}>
-        Filter resource logs by text or /regexp/
+        Filter resource logs by regexp
       </SrOnly>
       <TiltInfoTooltip
         id={FILTER_FIELD_TOOLTIP_ID}

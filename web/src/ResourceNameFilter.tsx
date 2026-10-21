@@ -17,19 +17,40 @@ import {
   SizeUnit,
 } from "./style-helpers"
 
+const RESOURCE_NAME_REGEXP_FLAGS = "i"
+
+// Empty string when the filter is blank or a valid regexp.
+// Invalid patterns match every resource so the list stays visible while typing.
+export function resourceNameFilterError(filter: string): string {
+  const pattern = filter.trim()
+  if (pattern === "") {
+    return ""
+  }
+  try {
+    new RegExp(pattern, RESOURCE_NAME_REGEXP_FLAGS)
+    return ""
+  } catch (error: any) {
+    let message = "Invalid regexp"
+    if (error.message) {
+      message += `: ${error.message}`
+    }
+    return message
+  }
+}
+
 export function matchesResourceName(
   resourceName: string,
   filter: string
 ): boolean {
-  filter = filter.trim()
-  // this is functionally redundant but probably an important enough case to make its own thing
-  if (filter === "") {
+  const pattern = filter.trim()
+  if (pattern === "") {
     return true
   }
-  // a resource matches the query if the resource name contains all tokens in the query
-  return filter
-    .split(" ")
-    .every((token) => resourceName.toLowerCase().includes(token.toLowerCase()))
+  try {
+    return new RegExp(pattern, RESOURCE_NAME_REGEXP_FLAGS).test(resourceName)
+  } catch {
+    return true
+  }
 }
 
 export const ResourceNameFilterTextField = styled(InstrumentedTextField)`
@@ -47,6 +68,14 @@ export const ResourceNameFilterTextField = styled(InstrumentedTextField)`
     &.Mui-focused fieldset {
       border: 1px solid ${Color.gray40};
     }
+    &.Mui-error {
+      border-color: ${Color.red};
+    }
+    &.Mui-error fieldset,
+    &.Mui-error:hover fieldset,
+    &.Mui-error.Mui-focused fieldset {
+      border: 1px solid ${Color.red};
+    }
     & .MuiOutlinedInput-input {
       padding: ${SizeUnit(0.2)};
     }
@@ -60,6 +89,12 @@ export const ResourceNameFilterTextField = styled(InstrumentedTextField)`
     font-family: ${Font.monospace};
     color: ${Color.offWhite};
     font-size: ${FontSize.small};
+  }
+
+  & .MuiFormHelperText-root.Mui-error {
+    color: ${Color.red};
+    font-family: ${Font.sansSerif};
+    font-size: ${FontSize.smallest};
   }
 `
 
@@ -81,8 +116,10 @@ export function ResourceNameFilter(props: { className?: string }) {
     setOptions({ resourceNameFilter: newValue })
   }
 
+  const regexpError = resourceNameFilterError(resourceNameFilter)
+
   let inputProps: Partial<StandardInputProps> = {
-    "aria-label": "Filter resources by name",
+    "aria-label": "Filter resources by regexp",
     startAdornment: (
       <InputAdornment position="start">
         <SearchSvg fill={Color.grayLightest} />
@@ -112,7 +149,9 @@ export function ResourceNameFilter(props: { className?: string }) {
       className={props.className}
       value={resourceNameFilter ?? ""}
       onChange={(e) => setResourceNameFilter(e.target.value)}
-      placeholder="Filter resources by name"
+      placeholder="Filter resources by regexp"
+      error={regexpError !== ""}
+      helperText={regexpError}
       InputProps={inputProps}
       variant="outlined"
     />

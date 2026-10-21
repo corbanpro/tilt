@@ -57,7 +57,7 @@ describe("Log filters", () => {
     })
 
     describe("term parsing", () => {
-      describe("for string literals", () => {
+      describe("for regular expressions", () => {
         it("matches on the expected text", () => {
           expect(parseTermInput("abc").test(TestStrings.Basic)).toBe(true)
           expect(parseTermInput("SERVICE").test(TestStrings.BuildCommand)).toBe(
@@ -88,57 +88,36 @@ describe("Log filters", () => {
           expect(parsed.test("line 126")).toBe(true)
         })
 
-        it("escapes any RegExp-specific characters", () => {
-          expect(parseTermInput("ab?c").test(TestStrings.Basic)).toBe(false)
-          expect(parseTermInput('"red"').test(TestStrings.BuildCommand)).toBe(
+        it("interprets regexp syntax without surrounding slashes", () => {
+          expect(parseTermInput("ab?c").test(TestStrings.Basic)).toBe(true)
+          expect(
+            parseTermInput("error.+main").test(TestStrings.BuildErrorInFile)
+          ).toBe(true)
+          expect(parseTermInput("d+").test(TestStrings.Basic)).toBe(false)
+          expect(parseTermInput("d+").test(TestStrings.BuildInfoLine)).toBe(
             true
           )
           expect(
-            parseTermInput("generate-start.sh").test(TestStrings.BuildCommand)
-          ).toBe(true)
-          expect(parseTermInput("w").test(TestStrings.BuildInfoLine)).toBe(
-            false
-          )
-          expect(
-            parseTermInput("comma or )").test(TestStrings.SyntaxError)
+            parseTermInput("failed:").test(TestStrings.BuildError404)
           ).toBe(true)
           expect(
-            parseTermInput("ERROR.+").test(TestStrings.BuildErrorInFile)
-          ).toBe(false)
-          expect(parseTermInput("[1/5]").test(TestStrings.BuildInfoLine)).toBe(
-            true
-          )
+            parseTermInput("\\[1/5\\]").test(TestStrings.BuildInfoLine)
+          ).toBe(true)
         })
-      })
 
-      describe("for regular expressions", () => {
-        it("only parses strings surrounded by forward slashes as regexp", () => {
+        it("treats surrounding slashes as part of the pattern", () => {
+          expect(parseTermInput("docker").test(TestStrings.BuildInfoLine)).toBe(
+            true
+          )
           expect(
             parseTermInput("/docker/").test(TestStrings.BuildInfoLine)
-          ).toBe(true)
-          expect(
-            parseTermInput("/docker").test(TestStrings.BuildInfoLine)
           ).toBe(false)
-        })
-
-        it("matches on the expected text", () => {
-          expect(parseTermInput("/ab?c/").test(TestStrings.Basic)).toBe(true)
-          expect(
-            parseTermInput("/error.+main/").test(TestStrings.BuildErrorInFile)
-          ).toBe(true)
-          expect(parseTermInput("/d+/").test(TestStrings.Basic)).toBe(false)
-          expect(parseTermInput("/d+/").test(TestStrings.BuildInfoLine)).toBe(
-            true
-          )
-          expect(
-            parseTermInput("/failed:/").test(TestStrings.BuildError404)
-          ).toBe(true)
         })
 
         it("throws an error when input text is invalid regex", () => {
-          expect(() =>
-            parseTermInput("/(missing)? parenthesis)/")
-          ).toThrowError(/Invalid regular expression/)
+          expect(() => parseTermInput("(missing)? parenthesis)")).toThrowError(
+            /Invalid regular expression/
+          )
         })
       })
     })
