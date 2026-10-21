@@ -5,7 +5,10 @@ import { Flag, useFeatures } from "./feature"
 import { InstrumentedCheckbox } from "./instrumentedComponents"
 import { getResourceLabels, TILTFILE_LABEL, UNLABELED_LABEL } from "./labels"
 import { CollapseButton, ExpandButton } from "./resourceListOptionsButtons"
-import { useResourceListOptions } from "./ResourceListOptionsContext"
+import {
+  resourceListFilterApplied,
+  useResourceListOptions,
+} from "./ResourceListOptionsContext"
 import { resourceIsDisabled } from "./ResourceStatus"
 import { Color, Font, FontSize } from "./style-helpers"
 import { ResourceName, UIResource } from "./types"
@@ -87,7 +90,7 @@ export function OverviewTableDisplayOptions(props: {
     () => toGroups(resources, hideDisabledResources),
     [resources, hideDisabledResources]
   )
-  const resourceFilterApplied = options.resourceNameFilter.length > 0
+  const resourceFilterApplied = resourceListFilterApplied(options)
   const displayResourceGroups =
     labelsEnabled && groups.length && !resourceFilterApplied
 

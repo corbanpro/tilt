@@ -1,11 +1,19 @@
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import React from "react"
 import { MemoryRouter } from "react-router"
+import { tiltfileKeyContext } from "./BrowserStorage"
+import { ResourceListOptionsProvider } from "./ResourceListOptionsContext"
 import {
+  AllResourceStatusSummary,
   getDocumentTitle,
+  matchesStatusFilter,
   ResourceGroupStatus,
+  statusCounts,
   StatusCounts,
 } from "./ResourceStatusSummary"
+import { oneResource } from "./testdata"
+import { ResourceStatus, UIResource, UpdateStatus } from "./types"
 
 function expectStatusCounts(expected: { label: string; counts: number[] }[]) {
   const actual = expected.map(({ label, counts }) => {
@@ -129,6 +137,60 @@ it("links to warning and unhealthy resources when `linkToLogFilters` is true", (
   ).toBeInTheDocument()
 })
 
+it("filters by status instead of linking to logs when a toggle handler is set", () => {
+  const onStatusFilterToggle = jest.fn()
+  render(
+    <MemoryRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
+      <ResourceGroupStatus
+        counts={testCounts}
+        healthyLabel="healthy"
+        displayText="resources"
+        labelText="Testing resource status summary"
+        unhealthyLabel="unhealthy"
+        warningLabel="warning"
+        linkToLogFilters={true}
+        onStatusFilterToggle={onStatusFilterToggle}
+      />
+    </MemoryRouter>
+  )
+
+  expect(screen.queryByRole("link")).toBeNull()
+
+  userEvent.click(screen.getByRole("button", { name: "Filter by failed" }))
+  userEvent.click(screen.getByRole("button", { name: "Filter by warning" }))
+  userEvent.click(screen.getByRole("button", { name: "Filter by healthy" }))
+
+  expect(onStatusFilterToggle).toHaveBeenCalledWith("unhealthy")
+  expect(onStatusFilterToggle).toHaveBeenCalledWith("warning")
+  expect(onStatusFilterToggle).toHaveBeenCalledWith("healthy")
+})
+
+it("keeps the active status visible so the filter can be cleared at zero", () => {
+  render(
+    <MemoryRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
+      <ResourceGroupStatus
+        counts={{ ...testCounts, pending: 0 }}
+        healthyLabel="healthy"
+        displayText="resources"
+        labelText="Testing resource status summary"
+        unhealthyLabel="unhealthy"
+        warningLabel="warning"
+        linkToLogFilters={false}
+        statusFilter="pending"
+        onStatusFilterToggle={() => {}}
+      />
+    </MemoryRouter>
+  )
+
+  expect(
+    screen.getByRole("button", { name: "Clear pending filter" })
+  ).toHaveAttribute("aria-pressed", "true")
+})
+
 it("does NOT link to warning and unhealthy resources when `linkToLogFilters` is false", () => {
   render(
     <MemoryRouter
@@ -147,6 +209,102 @@ it("does NOT link to warning and unhealthy resources when `linkToLogFilters` is 
   )
 
   expect(screen.queryByRole("link")).toBeNull()
+})
+
+describe("status filter matching", () => {
+  it("counts warnings as healthy, since the healthy indicator includes them", () => {
+    expect(statusCounts([ResourceStatus.Warning])).toEqual({
+      totalEnabled: 1,
+      healthy: 1,
+      unhealthy: 0,
+      pending: 0,
+      warning: 1,
+      disabled: 0,
+    })
+    expect(matchesStatusFilter(ResourceStatus.Warning, "healthy")).toBe(true)
+    expect(matchesStatusFilter(ResourceStatus.Warning, "warning")).toBe(true)
+    expect(matchesStatusFilter(ResourceStatus.Healthy, "warning")).toBe(false)
+  })
+
+  it("treats building resources as pending", () => {
+    expect(matchesStatusFilter(ResourceStatus.Building, "pending")).toBe(true)
+    expect(matchesStatusFilter(ResourceStatus.Pending, "pending")).toBe(true)
+    expect(matchesStatusFilter(ResourceStatus.Unhealthy, "unhealthy")).toBe(
+      true
+    )
+  })
+})
+
+function resourceWithUpdateStatus(
+  name: string,
+  updateStatus: UpdateStatus
+): UIResource {
+  const resource = oneResource({ name })
+  resource.status!.updateStatus = updateStatus
+  return resource
+}
+
+describe("clicking status indicators", () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+  })
+
+  function renderSummary() {
+    const resources = [
+      resourceWithUpdateStatus("ok-resource", UpdateStatus.Ok),
+      resourceWithUpdateStatus("failed-resource", UpdateStatus.Error),
+      resourceWithUpdateStatus("pending-resource", UpdateStatus.Pending),
+      resourceWithUpdateStatus("building-resource", UpdateStatus.InProgress),
+    ]
+    render(
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <tiltfileKeyContext.Provider value="test">
+          <ResourceListOptionsProvider>
+            <AllResourceStatusSummary
+              resources={resources}
+              updateMetadata={false}
+              showNotifications={false}
+            />
+          </ResourceListOptionsProvider>
+        </tiltfileKeyContext.Provider>
+      </MemoryRouter>
+    )
+  }
+
+  it("toggles a resource status filter and does not link to logs", () => {
+    renderSummary()
+
+    expect(screen.queryByRole("link")).toBeNull()
+
+    userEvent.click(screen.getByRole("button", { name: "Filter by failed" }))
+    expect(
+      screen.getByRole("button", { name: "Clear failed filter" })
+    ).toHaveAttribute("aria-pressed", "true")
+    expect(
+      screen.getByRole("button", { name: "Filter by pending" })
+    ).toHaveAttribute("aria-pressed", "false")
+
+    userEvent.click(screen.getByRole("button", { name: "Clear failed filter" }))
+    expect(
+      screen.getByRole("button", { name: "Filter by failed" })
+    ).toHaveAttribute("aria-pressed", "false")
+  })
+
+  it("switches the filter when a different status is clicked", () => {
+    renderSummary()
+
+    userEvent.click(screen.getByRole("button", { name: "Filter by failed" }))
+    userEvent.click(screen.getByRole("button", { name: "Filter by pending" }))
+
+    expect(
+      screen.getByRole("button", { name: "Clear pending filter" })
+    ).toHaveAttribute("aria-pressed", "true")
+    expect(
+      screen.getByRole("button", { name: "Filter by failed" })
+    ).toHaveAttribute("aria-pressed", "false")
+  })
 })
 
 describe("document metadata based on resource statuses", () => {

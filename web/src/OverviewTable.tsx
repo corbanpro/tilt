@@ -59,14 +59,18 @@ import {
 import { useResourceGroups } from "./ResourceGroupsContext"
 import {
   ResourceListOptions,
+  resourceListFilterApplied,
   useResourceListOptions,
 } from "./ResourceListOptionsContext"
 import { matchesResourceName } from "./ResourceNameFilter"
 import { useResourceSelection } from "./ResourceSelectionContext"
 import { resourceIsDisabled, resourceTargetType } from "./ResourceStatus"
-import { TableGroupStatusSummary } from "./ResourceStatusSummary"
+import {
+  matchesStatusFilter,
+  TableGroupStatusSummary,
+} from "./ResourceStatusSummary"
 import { ShowMoreButton } from "./ShowMoreButton"
-import { buildStatus, runtimeStatus } from "./status"
+import { buildStatus, combinedStatus, runtimeStatus } from "./status"
 import { Color, Font, FontSize, SizeUnit } from "./style-helpers"
 import { isZeroTime, timeDiff } from "./time"
 import {
@@ -284,10 +288,7 @@ const GROUP_INFO_TOOLTIP_ID = "table-groups-info"
 export function TableResourceResultCount(props: { resources?: UIResource[] }) {
   const { options } = useResourceListOptions()
 
-  if (
-    props.resources === undefined ||
-    options.resourceNameFilter.length === 0
-  ) {
+  if (props.resources === undefined || !resourceListFilterApplied(options)) {
     return null
   }
 
@@ -303,7 +304,7 @@ export function TableResourceResultCount(props: { resources?: UIResource[] }) {
 export function TableNoMatchesFound(props: { resources?: UIResource[] }) {
   const { options } = useResourceListOptions()
 
-  if (props.resources?.length === 0 && options.resourceNameFilter.length > 0) {
+  if (props.resources?.length === 0 && resourceListFilterApplied(options)) {
     return <NoMatchesFound>No matching resources</NoMatchesFound>
   }
 
@@ -353,7 +354,8 @@ function calculateNextSort(
 function applyOptionsToResources(
   resources: UIResource[] | undefined,
   options: ResourceListOptions,
-  features: Features
+  features: Features,
+  alertIndex: LogAlertIndex
 ): UIResource[] {
   if (!resources) {
     return []
@@ -361,9 +363,10 @@ function applyOptionsToResources(
 
   const hideDisabledResources = !options.showDisabledResources
   const resourceNameFilter = options.resourceNameFilter.length > 0
+  const resourceStatusFilter = options.resourceStatusFilter.length > 0
 
   // If there are no options to apply to the resources, return the un-filtered, sorted list
-  if (!resourceNameFilter && !hideDisabledResources) {
+  if (!resourceNameFilter && !hideDisabledResources && !resourceStatusFilter) {
     return sortByDisableStatus(resources)
   }
 
@@ -374,11 +377,21 @@ function applyOptionsToResources(
       return false
     }
 
-    if (resourceNameFilter) {
-      return matchesResourceName(
-        r.metadata?.name || "",
-        options.resourceNameFilter
+    if (
+      resourceNameFilter &&
+      !matchesResourceName(r.metadata?.name || "", options.resourceNameFilter)
+    ) {
+      return false
+    }
+
+    if (resourceStatusFilter) {
+      const status = combinedStatus(
+        buildStatus(r, alertIndex),
+        runtimeStatus(r, alertIndex)
       )
+      if (!matchesStatusFilter(status, options.resourceStatusFilter)) {
+        return false
+      }
     }
 
     return true
@@ -864,17 +877,19 @@ function OverviewTableContent(props: OverviewTableProps) {
     false
 
   const { options } = useResourceListOptions()
-  const resourceFilterApplied = options.resourceNameFilter.length > 0
+  const logAlertIndex = useLogAlertIndex()
+  const resourceFilterApplied = resourceListFilterApplied(options)
 
   // Apply any display filters or options to resources, plus sort for initial view
   const resourcesToDisplay = applyOptionsToResources(
     props.view.uiResources,
     options,
-    features
+    features,
+    logAlertIndex
   )
 
   // Table groups are displayed when feature is enabled, resources have labels,
-  // and no resource name filter is applied
+  // and no resource name or status filter is applied
   const displayResourceGroups =
     labelsEnabled && resourcesHaveLabels && !resourceFilterApplied
 

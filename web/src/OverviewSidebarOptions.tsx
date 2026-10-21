@@ -5,7 +5,10 @@ import { Flag, useFeatures } from "./feature"
 import { InstrumentedCheckbox } from "./instrumentedComponents"
 import { TILTFILE_LABEL, UNLABELED_LABEL } from "./labels"
 import { CollapseButton, ExpandButton } from "./resourceListOptionsButtons"
-import { useResourceListOptions } from "./ResourceListOptionsContext"
+import {
+  resourceListFilterApplied,
+  useResourceListOptions,
+} from "./ResourceListOptionsContext"
 import { ResourceNameFilter } from "./ResourceNameFilter"
 import SidebarItem from "./SidebarItem"
 import { sidebarItemIsDisabled } from "./SidebarItemView"
@@ -120,7 +123,7 @@ export function OverviewSidebarOptions(props: { items?: SidebarItem[] }) {
     () => toGroups(items, hideDisabledResources),
     [items, hideDisabledResources]
   )
-  const resourceFilterApplied = options.resourceNameFilter.length > 0
+  const resourceFilterApplied = resourceListFilterApplied(options)
   const displayResourceGroups =
     labelsEnabled && groups.length && !resourceFilterApplied
 

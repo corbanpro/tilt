@@ -243,6 +243,97 @@ describe("resource name filter", () => {
   })
 })
 
+describe("resource status filter", () => {
+  function viewWithStatuses() {
+    const view = nResourceView(5)
+    view.uiResources[1].status!.updateStatus = UpdateStatus.Error
+    view.uiResources[2].status!.updateStatus = UpdateStatus.Pending
+    view.uiResources[3].status!.updateStatus = UpdateStatus.InProgress
+    return view
+  }
+
+  function displayedNames(container: HTMLElement): string[] {
+    return Array.from(container.querySelectorAll(Name)).map(
+      (name) => name.textContent ?? ""
+    )
+  }
+
+  it("shows only resources with the selected status", () => {
+    const { container } = render(
+      tableViewWithSettings({
+        view: viewWithStatuses(),
+        resourceListOptions: {
+          ...DEFAULT_OPTIONS,
+          resourceStatusFilter: "unhealthy",
+        },
+      })
+    )
+
+    expect(displayedNames(container)).toEqual(["_1"])
+    expect(container.querySelector(ResourceResultCount)?.textContent).toEqual(
+      "1 result"
+    )
+  })
+
+  it("includes building resources in the pending filter", () => {
+    const { container } = render(
+      tableViewWithSettings({
+        view: viewWithStatuses(),
+        resourceListOptions: {
+          ...DEFAULT_OPTIONS,
+          resourceStatusFilter: "pending",
+        },
+      })
+    )
+
+    expect(displayedNames(container)).toEqual(["_2", "_3"])
+  })
+
+  it("shows healthy resources for the successful indicator", () => {
+    const { container } = render(
+      tableViewWithSettings({
+        view: viewWithStatuses(),
+        resourceListOptions: {
+          ...DEFAULT_OPTIONS,
+          resourceStatusFilter: "healthy",
+        },
+      })
+    )
+
+    expect(displayedNames(container)).toEqual(["(Tiltfile)", "_4"])
+  })
+
+  it("shows a no-matches message when nothing has that status", () => {
+    const { container } = render(
+      tableViewWithSettings({
+        view: viewWithStatuses(),
+        resourceListOptions: {
+          ...DEFAULT_OPTIONS,
+          resourceStatusFilter: "warning",
+        },
+      })
+    )
+
+    expect(container.querySelector(NoMatchesFound)).toBeTruthy()
+    expect(displayedNames(container)).toEqual([])
+  })
+
+  it("applies the name filter and status filter together", () => {
+    const { container } = render(
+      tableViewWithSettings({
+        view: viewWithStatuses(),
+        resourceListOptions: {
+          ...DEFAULT_OPTIONS,
+          resourceNameFilter: "2",
+          resourceStatusFilter: "pending",
+        },
+      })
+    )
+
+    expect(displayedNames(container)).toEqual(["_2"])
+  })
+})
+
 describe("when labels feature is enabled", () => {
   it("it displays tables grouped by labels if resources have labels", () => {
     const { container } = render(
@@ -598,6 +689,7 @@ describe("overview table with groups", () => {
           labelsEnabled: true,
           resourceListOptions: {
             resourceNameFilter: "filtering!",
+            resourceStatusFilter: "",
             alertsOnTop: false,
             showDisabledResources: true,
           },
