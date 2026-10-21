@@ -11,12 +11,17 @@ import { FilterLevel } from "./logfilters"
 import { useLogStore } from "./LogStore"
 import { RowValues } from "./OverviewTableColumns"
 import { usePathBuilder } from "./PathBuilder"
+import {
+  ResourceStatusFilter,
+  useResourceListOptions,
+} from "./ResourceListOptionsContext"
 import SidebarItem from "./SidebarItem"
 import { buildStatus, combinedStatus, runtimeStatus } from "./status"
 import {
   Color,
   Font,
   FontSize,
+  mixinResetButtonStyle,
   mixinResetListStyle,
   SizeUnit,
   spin,
@@ -91,6 +96,25 @@ export const PendingIcon = styled(PendingSvg)`
   animation: ${spin} 4s linear infinite;
 `
 
+const StatusFilterButton = styled.button`
+  ${mixinResetButtonStyle}
+  display: flex;
+  align-items: center;
+  color: inherit;
+  border-radius: 4px;
+  padding: 1px 3px;
+
+  &:hover,
+  &:focus-visible {
+    background-color: ${Color.gray30};
+  }
+
+  &.is-selected {
+    background-color: ${Color.gray30};
+    box-shadow: inset 0 0 0 1px currentColor;
+  }
+`
+
 const DisabledIcon = styled(DisabledSvg)`
   .fillStd {
     fill: ${Color.gray60};
@@ -104,7 +128,18 @@ type ResourceGroupStatusItemProps = {
   count: number
   countOutOf?: number
   href?: string
+  pressed?: boolean
+  onClick?: () => void
+  filterLabel?: string
 }
+
+function statusFilterActionLabel(
+  filterLabel: string,
+  pressed?: boolean
+): string {
+  return pressed ? `Clear ${filterLabel} filter` : `Filter by ${filterLabel}`
+}
+
 export function ResourceGroupStatusItem(props: ResourceGroupStatusItemProps) {
   const count = (
     <>
@@ -122,16 +157,46 @@ export function ResourceGroupStatusItem(props: ResourceGroupStatusItemProps) {
     </>
   )
 
-  const summaryContent = props.href ? (
-    <Link to={props.href}>{count}</Link>
-  ) : (
-    <>{count}</>
-  )
+  const interactive = !!props.onClick
+  const tooltipTitle = interactive
+    ? statusFilterActionLabel(props.filterLabel || props.label, props.pressed)
+    : props.label
+
+  let summaryContent: JSX.Element
+  if (interactive) {
+    summaryContent = (
+      <StatusFilterButton
+        type="button"
+        className={props.pressed ? "is-selected" : undefined}
+        aria-pressed={!!props.pressed}
+        aria-label={tooltipTitle}
+        onClick={props.onClick}
+      >
+        {props.icon}
+        {count}
+      </StatusFilterButton>
+    )
+  } else {
+    const countDisplay = props.href ? (
+      <Link to={props.href}>{count}</Link>
+    ) : (
+      <>{count}</>
+    )
+    summaryContent = (
+      <>
+        {props.icon}
+        {countDisplay}
+      </>
+    )
+  }
+
+  const className = props.pressed
+    ? `${props.className} is-selected`
+    : props.className
 
   return (
-    <Tooltip title={props.label}>
-      <ResourceGroupStatusSummaryItemRoot className={props.className}>
-        {props.icon}
+    <Tooltip title={tooltipTitle}>
+      <ResourceGroupStatusSummaryItemRoot className={className}>
         {summaryContent}
       </ResourceGroupStatusSummaryItemRoot>
     </Tooltip>
@@ -146,6 +211,8 @@ type ResourceGroupStatusProps = {
   unhealthyLabel: string
   warningLabel: string
   linkToLogFilters: boolean
+  statusFilter?: ResourceStatusFilter | ""
+  onStatusFilterToggle?: (filter: ResourceStatusFilter) => void
 }
 
 export function ResourceGroupStatus(props: ResourceGroupStatusProps) {
@@ -156,10 +223,22 @@ export function ResourceGroupStatus(props: ResourceGroupStatusProps) {
 
   let items = new Array<JSX.Element>()
 
-  if (props.counts.unhealthy) {
-    const errorHref = props.linkToLogFilters
-      ? pb.encpath`/r/${ResourceName.all}/overview?level=${FilterLevel.error}`
-      : undefined
+  function filterProps(filter: ResourceStatusFilter, filterLabel: string) {
+    if (!props.onStatusFilterToggle) {
+      return {}
+    }
+    return {
+      filterLabel,
+      pressed: props.statusFilter === filter,
+      onClick: () => props.onStatusFilterToggle!(filter),
+    }
+  }
+
+  if (props.counts.unhealthy || props.statusFilter === "unhealthy") {
+    const errorHref =
+      props.linkToLogFilters && !props.onStatusFilterToggle
+        ? pb.encpath`/r/${ResourceName.all}/overview?level=${FilterLevel.error}`
+        : undefined
     items.push(
       <ResourceGroupStatusItem
         key={props.unhealthyLabel}
@@ -168,14 +247,16 @@ export function ResourceGroupStatus(props: ResourceGroupStatusProps) {
         href={errorHref}
         className="is-highlightError"
         icon={<CloseSvg role="presentation" width="11" key="icon" />}
+        {...filterProps("unhealthy", "failed")}
       />
     )
   }
 
-  if (props.counts.warning) {
-    const warningHref = props.linkToLogFilters
-      ? pb.encpath`/r/${ResourceName.all}/overview?level=${FilterLevel.warn}`
-      : undefined
+  if (props.counts.warning || props.statusFilter === "warning") {
+    const warningHref =
+      props.linkToLogFilters && !props.onStatusFilterToggle
+        ? pb.encpath`/r/${ResourceName.all}/overview?level=${FilterLevel.warn}`
+        : undefined
     items.push(
       <ResourceGroupStatusItem
         key={props.warningLabel}
@@ -184,11 +265,12 @@ export function ResourceGroupStatus(props: ResourceGroupStatusProps) {
         href={warningHref}
         className="is-highlightWarning"
         icon={<WarningSvg role="presentation" width="7" key="icon" />}
+        {...filterProps("warning", "warning")}
       />
     )
   }
 
-  if (props.counts.pending) {
+  if (props.counts.pending || props.statusFilter === "pending") {
     items.push(
       <ResourceGroupStatusItem
         key="pending"
@@ -196,13 +278,14 @@ export function ResourceGroupStatus(props: ResourceGroupStatusProps) {
         count={props.counts.pending}
         className="is-highlightPending"
         icon={<PendingIcon role="presentation" width="8" key="icon" />}
+        {...filterProps("pending", "pending")}
       />
     )
   }
 
   // There might not always be enabled resources
   // if all resources are disabled
-  if (props.counts.totalEnabled) {
+  if (props.counts.totalEnabled || props.statusFilter === "healthy") {
     items.push(
       <ResourceGroupStatusItem
         key={props.healthyLabel}
@@ -211,6 +294,7 @@ export function ResourceGroupStatus(props: ResourceGroupStatusProps) {
         countOutOf={props.counts.totalEnabled}
         className="is-highlightHealthy"
         icon={<CheckmarkSmallSvg role="presentation" key="icon" />}
+        {...filterProps("healthy", "healthy")}
       />
     )
   }
@@ -248,7 +332,31 @@ export type StatusCounts = {
   disabled: number
 }
 
-function statusCounts(statuses: ResourceStatus[]): StatusCounts {
+// True when `status` is one of the resources counted by that summary indicator.
+// The healthy indicator includes warnings, matching `statusCounts`.
+export function matchesStatusFilter(
+  status: ResourceStatus,
+  filter: ResourceStatusFilter | ""
+): boolean {
+  switch (filter) {
+    case "pending":
+      return (
+        status === ResourceStatus.Pending || status === ResourceStatus.Building
+      )
+    case "unhealthy":
+      return status === ResourceStatus.Unhealthy
+    case "warning":
+      return status === ResourceStatus.Warning
+    case "healthy":
+      return (
+        status === ResourceStatus.Healthy || status === ResourceStatus.Warning
+      )
+    case "":
+      return true
+  }
+}
+
+export function statusCounts(statuses: ResourceStatus[]): StatusCounts {
   let allEnabledStatusCount = 0
   let healthyStatusCount = 0
   let unhealthyStatusCount = 0
@@ -256,31 +364,27 @@ function statusCounts(statuses: ResourceStatus[]): StatusCounts {
   let warningCount = 0
   let disabledCount = 0
   statuses.forEach((status) => {
-    switch (status) {
-      case ResourceStatus.Warning:
-        allEnabledStatusCount++
-        healthyStatusCount++
-        warningCount++
-        break
-      case ResourceStatus.Healthy:
-        allEnabledStatusCount++
-        healthyStatusCount++
-        break
-      case ResourceStatus.Unhealthy:
-        allEnabledStatusCount++
-        unhealthyStatusCount++
-        break
-      case ResourceStatus.Pending:
-      case ResourceStatus.Building:
-        allEnabledStatusCount++
-        pendingStatusCount++
-        break
-      case ResourceStatus.Disabled:
-        disabledCount++
-        break
-      default:
+    if (status === ResourceStatus.Disabled) {
+      disabledCount++
+      return
+    }
+    if (status === ResourceStatus.None) {
       // Don't count None status in the overall resource count.
       // These might be manual tasks we haven't run yet.
+      return
+    }
+    allEnabledStatusCount++
+    if (matchesStatusFilter(status, "healthy")) {
+      healthyStatusCount++
+    }
+    if (matchesStatusFilter(status, "unhealthy")) {
+      unhealthyStatusCount++
+    }
+    if (matchesStatusFilter(status, "pending")) {
+      pendingStatusCount++
+    }
+    if (matchesStatusFilter(status, "warning")) {
+      warningCount++
     }
   })
 
@@ -432,6 +536,8 @@ type ResourceStatusSummaryOptions = {
   updateMetadata?: boolean
   linkToLogFilters?: boolean
   showNotifications?: boolean
+  statusFilter?: ResourceStatusFilter | ""
+  onStatusFilterToggle?: (filter: ResourceStatusFilter) => void
 }
 
 type ResourceStatusSummaryProps = {
@@ -465,6 +571,8 @@ function ResourceStatusSummary(props: ResourceStatusSummaryProps) {
         unhealthyLabel={"err"}
         warningLabel={"warn"}
         linkToLogFilters={linkToLogFilters}
+        statusFilter={props.statusFilter}
+        onStatusFilterToggle={props.onStatusFilterToggle}
       />
     </ResourceStatusSummaryRoot>
   )
@@ -517,9 +625,25 @@ export function AllResourceStatusSummary(
   props: StatusSummaryProps<UIResource>
 ) {
   const logStore = useLogStore()
+  const { options, setOptions } = useResourceListOptions()
   const allStatuses = props.resources.map((r: UIResource) =>
     combinedStatus(buildStatus(r, logStore), runtimeStatus(r, logStore))
   )
 
-  return <ResourceStatusSummary statuses={allStatuses} {...props} />
+  const onStatusFilterToggle = (filter: ResourceStatusFilter) => {
+    setOptions({
+      resourceStatusFilter:
+        options.resourceStatusFilter === filter ? "" : filter,
+    })
+  }
+
+  return (
+    <ResourceStatusSummary
+      statuses={allStatuses}
+      {...props}
+      linkToLogFilters={false}
+      statusFilter={options.resourceStatusFilter}
+      onStatusFilterToggle={onStatusFilterToggle}
+    />
+  )
 }

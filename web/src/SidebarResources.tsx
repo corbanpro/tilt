@@ -28,9 +28,15 @@ import {
   ResourceGroupSummaryMixin,
 } from "./ResourceGroups"
 import { useResourceGroups } from "./ResourceGroupsContext"
-import { ResourceListOptions } from "./ResourceListOptionsContext"
+import {
+  ResourceListOptions,
+  resourceListFilterApplied,
+} from "./ResourceListOptionsContext"
 import { matchesResourceName } from "./ResourceNameFilter"
-import { SidebarGroupStatusSummary } from "./ResourceStatusSummary"
+import {
+  matchesStatusFilter,
+  SidebarGroupStatusSummary,
+} from "./ResourceStatusSummary"
 import { ShowMoreButton } from "./ShowMoreButton"
 import SidebarItem from "./SidebarItem"
 import SidebarItemView, {
@@ -39,6 +45,7 @@ import SidebarItemView, {
 } from "./SidebarItemView"
 import SidebarKeyboardShortcuts from "./SidebarKeyboardShortcuts"
 import { AnimDuration, Color, Font, FontSize, SizeUnit } from "./style-helpers"
+import { combinedStatus } from "./status"
 import { startBuild } from "./trigger"
 import { ResourceName, ResourceStatus, ResourceView } from "./types"
 import { useStarredResources } from "./StarredResourcesContext"
@@ -226,9 +233,10 @@ export function SidebarListSection(props: SidebarSectionProps): JSX.Element {
     <SidebarListSectionName>{props.sectionName}</SidebarListSectionName>
   ) : null
 
-  const resourceNameFilterApplied =
-    props.resourceListOptions.resourceNameFilter.length > 0
-  if (props.items.length === 0 && resourceNameFilterApplied) {
+  const resourceFilterApplied = resourceListFilterApplied(
+    props.resourceListOptions
+  )
+  if (props.items.length === 0 && resourceFilterApplied) {
     return (
       <>
         {sectionName}
@@ -449,7 +457,9 @@ function applyOptionsToItems(
   let itemsToDisplay: SidebarItem[] = [...items]
 
   const itemsShouldBeFiltered =
-    options.resourceNameFilter.length > 0 || !options.showDisabledResources
+    options.resourceNameFilter.length > 0 ||
+    options.resourceStatusFilter.length > 0 ||
+    !options.showDisabledResources
 
   if (itemsShouldBeFiltered) {
     itemsToDisplay = itemsToDisplay.filter((item) => {
@@ -458,8 +468,21 @@ function applyOptionsToItems(
         return false
       }
 
-      if (options.resourceNameFilter) {
-        return matchesResourceName(item.name, options.resourceNameFilter)
+      if (
+        options.resourceNameFilter &&
+        !matchesResourceName(item.name, options.resourceNameFilter)
+      ) {
+        return false
+      }
+
+      if (
+        options.resourceStatusFilter &&
+        !matchesStatusFilter(
+          combinedStatus(item.buildStatus, item.runtimeStatus),
+          options.resourceStatusFilter
+        )
+      ) {
+        return false
       }
 
       return true
@@ -496,8 +519,9 @@ export class SidebarResources extends React.Component<SidebarProps> {
     // only say no matches if there were actually items that got filtered out
     // otherwise, there might just be 0 resources because there are 0 resources
     // (though technically there's probably always at least a Tiltfile resource)
-    const resourceFilterApplied =
-      this.props.resourceListOptions.resourceNameFilter.length > 0
+    const resourceFilterApplied = resourceListFilterApplied(
+      this.props.resourceListOptions
+    )
     const sidebarName = resourceFilterApplied
       ? `${filteredItems.length} result${filteredItems.length === 1 ? "" : "s"}`
       : "resources"

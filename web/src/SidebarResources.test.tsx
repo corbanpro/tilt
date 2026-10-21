@@ -276,6 +276,7 @@ describe("SidebarResources", () => {
 
           const options = {
             resourceNameFilter: "1",
+            resourceStatusFilter: "" as const,
             alertsOnTop: true,
             showDisabledResources: true,
           }
@@ -352,5 +353,40 @@ describe("SidebarResources", () => {
         })
       })
     })
+  })
+})
+
+describe("resource status filter", () => {
+  it("shows only resources with the selected status", () => {
+    const items = createSidebarItems(4)
+    items[1].buildStatus = ResourceStatus.Unhealthy
+    items[2].buildStatus = ResourceStatus.Pending
+
+    customRender({
+      items,
+      resourceListOptions: {
+        ...DEFAULT_OPTIONS,
+        resourceStatusFilter: "unhealthy",
+      },
+    })
+
+    expect(screen.getByText("_1", { exact: true })).toBeInTheDocument()
+    expect(screen.queryByText("_2", { exact: true })).toBeNull()
+    expect(screen.queryByText("(Tiltfile)", { exact: true })).toBeNull()
+    expect(screen.getByText("1 result")).toBeInTheDocument()
+  })
+
+  it("shows a no-matches message when nothing has that status", () => {
+    const items = createSidebarItems(3)
+    customRender({
+      items,
+      resourceListOptions: {
+        ...DEFAULT_OPTIONS,
+        resourceStatusFilter: "warning",
+      },
+    })
+
+    expect(screen.getByText("No matching resources")).toBeInTheDocument()
+    expect(screen.getByText("0 results")).toBeInTheDocument()
   })
 })

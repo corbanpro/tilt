@@ -13,9 +13,30 @@ import { useSessionState } from "./BrowserStorage"
 // but the local storage key was kept the same
 export const RESOURCE_LIST_OPTIONS_KEY = "sidebar_options"
 
+// Statuses represented by the summary indicators at the top of the page.
+// Empty string means no status filter is applied.
+export const RESOURCE_STATUS_FILTERS = [
+  "pending",
+  "healthy",
+  "unhealthy",
+  "warning",
+] as const
+
+export type ResourceStatusFilter = typeof RESOURCE_STATUS_FILTERS[number]
+
+export function isResourceStatusFilter(
+  value: unknown
+): value is ResourceStatusFilter {
+  return (
+    typeof value === "string" &&
+    (RESOURCE_STATUS_FILTERS as readonly string[]).includes(value)
+  )
+}
+
 export type ResourceListOptions = {
   alertsOnTop: boolean // Note: this is only used/implemented in OverviewSidebar
   resourceNameFilter: string
+  resourceStatusFilter: ResourceStatusFilter | ""
   showDisabledResources: boolean
 }
 
@@ -27,7 +48,17 @@ type ResourceListOptionsContext = {
 export const DEFAULT_OPTIONS: ResourceListOptions = {
   alertsOnTop: false,
   resourceNameFilter: "",
+  resourceStatusFilter: "",
   showDisabledResources: false,
+}
+
+export function resourceListFilterApplied(
+  options: ResourceListOptions
+): boolean {
+  return (
+    options.resourceNameFilter.length > 0 ||
+    options.resourceStatusFilter.length > 0
+  )
 }
 
 const ResourceListOptionsContext = createContext<ResourceListOptionsContext>({
@@ -39,11 +70,20 @@ const ResourceListOptionsContext = createContext<ResourceListOptionsContext>({
 
 // Note: non-nullable fields added to `ResourceListOptions` (formerly `SidebarOptions`)
 // after its initial release need to have default values filled in here
-function maybeUpgradeSavedOptions(savedOptions: ResourceListOptions) {
+function normalizeStatusFilter(value: unknown): ResourceStatusFilter | "" {
+  return isResourceStatusFilter(value) ? value : ""
+}
+
+function maybeUpgradeSavedOptions(
+  savedOptions: ResourceListOptions
+): ResourceListOptions {
   return {
     ...savedOptions,
     resourceNameFilter: savedOptions.resourceNameFilter ?? "",
     showDisabledResources: savedOptions.showDisabledResources ?? false,
+    resourceStatusFilter: normalizeStatusFilter(
+      savedOptions.resourceStatusFilter
+    ),
   }
 }
 
